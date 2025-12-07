@@ -1,0 +1,5 @@
+{
+  "name": "NEW搞笑諾貝爾投票系統",
+  "description": "一個用於搞笑諾貝爾課堂報告的同儕投票系統，具有基於角色的投票限制和即時結果。",
+  "requestFramePermissions": []
+}
