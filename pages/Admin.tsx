@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { User, UserRole, Group } from '../types';
 import { Plus, Trash2, Users, Layers, AlertTriangle, Edit2, X, Save } from 'lucide-react';
 
 export const Admin: React.FC = () => {
-  const { users, groups, currentUser, addUser, updateUser, removeUser, addGroup, removeGroup, resetVotes } = useApp();
+  const { users, groups, currentUser, addUser, updateUser, removeUser, addGroup, updateGroup, removeGroup, resetVotes } = useApp();
   const [activeSection, setActiveSection] = useState<'users' | 'groups'>('groups');
   
   // Form States
@@ -12,11 +12,19 @@ export const Admin: React.FC = () => {
   const [isEditingUser, setIsEditingUser] = useState(false);
 
   const [newGroup, setNewGroup] = useState<Partial<Group>>({ members: [] });
+  const [isEditingGroup, setIsEditingGroup] = useState(false);
   const [tempMember, setTempMember] = useState('');
 
   if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.TEACHER)) {
     return <div>存取被拒 (Access Denied)</div>;
   }
+
+  // Sort groups by ID naturally (1, 2, 3...)
+  const sortedGroups = useMemo(() => {
+    return [...groups].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }, [groups]);
+
+  // --- User Handlers ---
 
   const handleUserSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,26 +52,46 @@ export const Admin: React.FC = () => {
   const handleEditUserClick = (user: User) => {
     setNewUser({ ...user });
     setIsEditingUser(true);
-    // Scroll to top of form
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEditUser = () => {
     setIsEditingUser(false);
     setNewUser({ role: UserRole.STUDENT, id: '', email: '', name: '', groupId: '' });
   };
 
-  const handleAddGroup = (e: React.FormEvent) => {
+  // --- Group Handlers ---
+
+  const handleGroupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newGroup.id && newGroup.title) {
-      addGroup({
+      const groupData: Group = {
         id: newGroup.id,
         title: newGroup.title,
         members: newGroup.members || [],
         imageUrl: newGroup.imageUrl || 'https://picsum.photos/600/400'
-      });
+      };
+
+      if (isEditingGroup) {
+        updateGroup(groupData);
+        setIsEditingGroup(false);
+      } else {
+        addGroup(groupData);
+      }
+
       setNewGroup({ id: '', title: '', members: [], imageUrl: '' });
     }
+  };
+
+  const handleEditGroupClick = (group: Group) => {
+    setNewGroup({ ...group });
+    setIsEditingGroup(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEditGroup = () => {
+    setIsEditingGroup(false);
+    setNewGroup({ id: '', title: '', members: [], imageUrl: '' });
   };
 
   const addMemberToGroupDraft = () => {
@@ -71,6 +99,13 @@ export const Admin: React.FC = () => {
       setNewGroup(prev => ({ ...prev, members: [...(prev.members || []), tempMember] }));
       setTempMember('');
     }
+  };
+
+  const removeMemberFromDraft = (index: number) => {
+    setNewGroup(prev => ({
+      ...prev,
+      members: prev.members?.filter((_, i) => i !== index)
+    }));
   };
 
   // Helper to get members from User list
@@ -111,15 +146,25 @@ export const Admin: React.FC = () => {
 
       {activeSection === 'groups' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Add Group Form */}
-          <div className="bg-white p-6 rounded-lg shadow-md h-fit">
-            <h3 className="text-lg font-bold mb-4">新增組別</h3>
-            <form onSubmit={handleAddGroup} className="space-y-4">
+          {/* Add/Edit Group Form */}
+          <div className={`bg-white p-6 rounded-lg shadow-md h-fit transition-all ${isEditingGroup ? 'ring-2 ring-ignobel-yellow' : ''}`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">{isEditingGroup ? '編輯組別' : '新增組別'}</h3>
+              {isEditingGroup && (
+                <button onClick={handleCancelEditGroup} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              )}
+            </div>
+
+            <form onSubmit={handleGroupSubmit} className="space-y-4">
               <input 
                 type="text" placeholder="組別代號 (例如：g5)" 
-                className="w-full border p-2 rounded"
+                className={`w-full border p-2 rounded ${isEditingGroup ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 value={newGroup.id || ''} onChange={e => setNewGroup({...newGroup, id: e.target.value})}
                 required
+                readOnly={isEditingGroup}
+                title={isEditingGroup ? "編輯模式下無法修改組別代號" : ""}
               />
               <input 
                 type="text" placeholder="報告題目" 
@@ -144,21 +189,31 @@ export const Admin: React.FC = () => {
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {newGroup.members?.map((m, i) => (
-                    <span key={i} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">{m}</span>
+                    <span key={i} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded flex items-center gap-1">
+                      {m}
+                      <button type="button" onClick={() => removeMemberFromDraft(i)} className="hover:text-red-500"><X size={10}/></button>
+                    </span>
                   ))}
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-brand-600 text-white py-2 rounded font-bold hover:bg-brand-700">建立組別</button>
+              <button 
+                type="submit" 
+                className={`w-full py-2 rounded font-bold text-white flex justify-center items-center gap-2 ${isEditingGroup ? 'bg-ignobel-yellow text-black hover:bg-yellow-500' : 'bg-brand-600 hover:bg-brand-700'}`}
+              >
+                 {isEditingGroup ? <><Save size={18}/> 儲存組別</> : <><Plus size={18}/> 建立組別</>}
+              </button>
             </form>
           </div>
 
           {/* Group List */}
           <div className="lg:col-span-2 space-y-4">
-            {groups.map(g => {
+            {sortedGroups.map(g => {
               const members = getGroupMembers(g.id, g.members);
+              const isEditingThis = isEditingGroup && newGroup.id === g.id;
+              
               return (
-                <div key={g.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-brand-500 flex justify-between items-center">
+                <div key={g.id} className={`bg-white p-4 rounded-lg shadow border-l-4 ${isEditingThis ? 'border-ignobel-yellow bg-yellow-50' : 'border-brand-500'} flex justify-between items-center`}>
                   <div className="flex gap-4 items-center">
                     <img src={g.imageUrl} alt="" className="w-16 h-16 object-cover rounded bg-gray-200" />
                     <div>
@@ -166,9 +221,22 @@ export const Admin: React.FC = () => {
                       <p className="text-sm text-gray-600">組員：{members.join('、')}</p>
                     </div>
                   </div>
-                  <button onClick={() => removeGroup(g.id)} className="text-red-400 hover:text-red-600 p-2">
-                    <Trash2 size={20} />
-                  </button>
+                  <div className="flex space-x-2">
+                     <button 
+                       onClick={() => handleEditGroupClick(g)} 
+                       className="text-brand-600 hover:text-brand-900 p-2"
+                       disabled={isEditingGroup && newGroup.id !== g.id}
+                     >
+                       <Edit2 size={20} />
+                     </button>
+                     <button 
+                       onClick={() => removeGroup(g.id)} 
+                       className="text-red-400 hover:text-red-600 p-2"
+                       disabled={isEditingGroup}
+                     >
+                       <Trash2 size={20} />
+                     </button>
+                  </div>
                 </div>
               );
             })}
@@ -184,7 +252,7 @@ export const Admin: React.FC = () => {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">{isEditingUser ? '編輯人員' : '新增投票人員'}</h3>
               {isEditingUser && (
-                <button onClick={handleCancelEdit} className="text-gray-400 hover:text-gray-600">
+                <button onClick={handleCancelEditUser} className="text-gray-400 hover:text-gray-600">
                   <X size={20} />
                 </button>
               )}
@@ -227,7 +295,8 @@ export const Admin: React.FC = () => {
                   value={newUser.groupId || ''} onChange={e => setNewUser({...newUser, groupId: e.target.value})}
                 >
                   <option value="">-- 指定組別 (選填) --</option>
-                  {groups.map(g => <option key={g.id} value={g.id}>{g.id} - {g.title}</option>)}
+                  {/* Sorted Group Options */}
+                  {sortedGroups.map(g => <option key={g.id} value={g.id}>{g.id} - {g.title}</option>)}
                 </select>
               )}
 

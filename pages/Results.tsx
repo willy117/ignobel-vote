@@ -4,7 +4,7 @@ import { UserRole } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Trophy } from 'lucide-react';
 
-const COLORS = ['#8b5cf6', '#0ea5e9', '#fbbf24', '#ef4444', '#10b981', '#f59e0b'];
+const COLORS = ['#8b5cf6', '#0ea5e9', '#fbbf24', '#ef4444', '#10b981', '#f59e0b', '#ec4899', '#6366f1', '#84cc16', '#14b8a6'];
 
 export const Results: React.FC = () => {
   const { groups, votes, users, currentUser } = useApp();
@@ -15,8 +15,8 @@ export const Results: React.FC = () => {
     return <div className="p-8 text-red-500">權限不足。僅限管理員與教師進入。</div>;
   }
 
-  // Aggregate Data
-  const resultsData = useMemo(() => {
+  // 1. Calculate raw votes mapped by Group ID
+  const voteMap = useMemo(() => {
     const map: {[key: string]: number} = {};
     groups.forEach(g => map[g.id] = 0);
     
@@ -27,14 +27,30 @@ export const Results: React.FC = () => {
         }
       });
     });
-
-    return groups.map(g => ({
-      id: g.id,
-      name: g.title,
-      shortName: `第 ${g.id} 組`,
-      votes: map[g.id]
-    })).sort((a, b) => b.votes - a.votes);
+    return map;
   }, [groups, votes]);
+
+  // 2. Data for Chart: Sorted by Group ID (1, 2, 3...)
+  const chartData = useMemo(() => {
+    return groups
+      .map(g => ({
+        id: g.id,
+        name: g.title,
+        shortName: `第 ${g.id} 組`,
+        votes: voteMap[g.id] || 0
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }, [groups, voteMap]);
+
+  // 3. Data for Top Cards: Sorted by Votes (High to Low)
+  const topPerformers = useMemo(() => {
+    return [...chartData].sort((a, b) => b.votes - a.votes);
+  }, [chartData]);
+
+  // 4. Sorted Groups for Table Columns (1, 2, 3...)
+  const sortedGroups = useMemo(() => {
+    return [...groups].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }, [groups]);
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8">
@@ -61,9 +77,9 @@ export const Results: React.FC = () => {
 
       {activeTab === 'overview' && (
         <div className="space-y-8">
-          {/* Top Cards */}
+          {/* Top Cards (Ranked by Votes) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             {resultsData.slice(0, 3).map((r, idx) => (
+             {topPerformers.slice(0, 3).map((r, idx) => (
                <div key={r.id} className={`bg-white p-6 rounded-xl shadow-lg border-t-4 ${idx === 0 ? 'border-ignobel-yellow transform scale-105' : 'border-brand-500'}`}>
                  <div className="text-gray-500 text-sm font-bold uppercase tracking-wide">第 {idx + 1} 名</div>
                  <div className="text-2xl font-bold mt-1 mb-2 leading-tight">{r.name}</div>
@@ -72,17 +88,17 @@ export const Results: React.FC = () => {
              ))}
           </div>
 
-          {/* Chart */}
+          {/* Chart (Sorted by Group ID) */}
           <div className="bg-white p-6 rounded-xl shadow-md h-96">
-            <h3 className="text-lg font-bold text-gray-700 mb-4">得票分佈</h3>
+            <h3 className="text-lg font-bold text-gray-700 mb-4">得票分佈 (依組別順序)</h3>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={resultsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="shortName" />
                 <YAxis />
                 <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
                 <Bar dataKey="votes" radius={[8, 8, 0, 0]}>
-                  {resultsData.map((entry, index) => (
+                  {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>
@@ -100,7 +116,8 @@ export const Results: React.FC = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">投票人</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">身分</th>
-                  {groups.map(g => (
+                  {/* Columns sorted by Group ID */}
+                  {sortedGroups.map(g => (
                     <th key={g.id} className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                       {g.id} 組
                     </th>
@@ -121,7 +138,7 @@ export const Results: React.FC = () => {
                           {voter?.role === UserRole.TEACHER ? '教師' : (voter?.role === UserRole.ADMIN ? '管理員' : '學生')}
                         </span>
                       </td>
-                      {groups.map(g => {
+                      {sortedGroups.map(g => {
                          const alloc = vote.allocations.find(a => a.groupId === g.id);
                          const val = alloc ? alloc.count : 0;
                          return (

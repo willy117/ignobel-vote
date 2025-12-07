@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
 import { CheckCircle, Minus, Plus, AlertCircle } from 'lucide-react';
@@ -12,6 +12,13 @@ export const Vote: React.FC = () => {
     const initial: { [key: string]: number } = {};
     groups.forEach(g => initial[g.id] = 0);
     setAllocations(initial);
+  }, [groups]);
+
+  // Sort groups by ID naturally (1, 2, 3... 10)
+  const sortedGroups = useMemo(() => {
+    return [...groups].sort((a, b) => {
+      return a.id.localeCompare(b.id, undefined, { numeric: true });
+    });
   }, [groups]);
 
   if (!currentUser) return <div>請先登入</div>;
@@ -69,7 +76,7 @@ export const Vote: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {groups.map(group => {
+        {sortedGroups.map(group => {
           const isOwnGroup = currentUser.role === UserRole.STUDENT && currentUser.groupId === group.id;
           const votes = allocations[group.id] || 0;
           const members = getGroupMembers(group.id, group.members);

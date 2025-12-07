@@ -1,9 +1,7 @@
-
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 // 安全地取得環境變數的輔助函式
-// 避免在不支援 import.meta.env 的環境中發生 Crash
 const getEnv = (key: string, fallback: string): string => {
   try {
     // @ts-ignore
@@ -12,27 +10,20 @@ const getEnv = (key: string, fallback: string): string => {
       return import.meta.env[key];
     }
   } catch (e) {
-    // 忽略錯誤，直接回傳 fallback
+    // 忽略錯誤
   }
   return fallback;
 };
 
-// 優先使用環境變數 (VITE_...), 若無則使用後方的預設字串
+// 使用 getEnv 確保優先讀取環境變數，失敗則使用 fallback
 const firebaseConfig = {
-  apiKey: "AIzaSyB4Nzez2FaiNhFcJco4x7DaETf_W41Maf0",
-  authDomain: "ignobel-vote.firebaseapp.com",
-  projectId: "ignobel-vote",
-  storageBucket: "ignobel-vote.firebasestorage.app",
-  messagingSenderId: "364006634772",
-  appId: "1:364006634772:web:cb24fd710057583c53be01"
+  apiKey: getEnv("VITE_FIREBASE_API_KEY", "AIzaSyB4Nzez2FaiNhFcJco4x7DaETf_W41Maf0"),
+  authDomain: getEnv("VITE_FIREBASE_AUTH_DOMAIN", "ignobel-vote.firebaseapp.com"),
+  projectId: getEnv("VITE_FIREBASE_PROJECT_ID", "ignobel-vote"),
+  storageBucket: getEnv("VITE_FIREBASE_STORAGE_BUCKET", "ignobel-vote.firebasestorage.app"),
+  messagingSenderId: getEnv("VITE_FIREBASE_MESSAGING_SENDER_ID", "364006634772"),
+  appId: getEnv("VITE_FIREBASE_APP_ID", "1:364006634772:web:cb24fd710057583c53be01")
 };
-
-// 簡單檢查設定是否已填寫
-const isConfigured = firebaseConfig.projectId !== "YOUR_PROJECT_ID";
-
-if (!isConfigured) {
-  console.warn("Firebase 尚未設定。請更新 firebaseConfig.ts 或設定環境變數。");
-}
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);

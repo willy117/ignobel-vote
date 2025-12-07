@@ -26,6 +26,7 @@ interface AppContextType {
   updateUser: (user: User) => Promise<void>;
   removeUser: (userId: string) => Promise<void>;
   addGroup: (group: Group) => Promise<void>;
+  updateGroup: (group: Group) => Promise<void>;
   removeGroup: (groupId: string) => Promise<void>;
   resetVotes: () => Promise<void>;
 }
@@ -207,6 +208,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Admin: Update Group
+  const updateGroup = async (group: Group) => {
+    const target = groups.find(g => g.id === group.id);
+    if (!target || !target.docId) return;
+
+    try {
+      const groupRef = doc(db, "groups", target.docId);
+      const { docId, ...dataToUpdate } = group;
+      await updateDoc(groupRef, dataToUpdate);
+    } catch (e) {
+      console.error("Error updating group:", e);
+      alert("更新組別失敗");
+    }
+  };
+
   // Admin: Remove Group
   const removeGroup = async (groupId: string) => {
     const target = groups.find(g => g.id === groupId);
@@ -260,6 +276,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       updateUser,
       removeUser,
       addGroup,
+      updateGroup,
       removeGroup,
       resetVotes
     }}>
