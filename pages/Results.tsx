@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Trophy, Sparkles, Timer, PartyPopper } from 'lucide-react';
+import { Trophy, Sparkles, Timer, PartyPopper, Download, FileSpreadsheet } from 'lucide-react';
 
 const COLORS = ['#8b5cf6', '#0ea5e9', '#fbbf24', '#ef4444', '#10b981', '#f59e0b', '#ec4899', '#6366f1', '#84cc16', '#14b8a6'];
 
@@ -73,6 +73,80 @@ export const Results: React.FC = () => {
     return () => clearTimeout(timer);
   }, [viewState, countdown]);
 
+  // --- CSV Export Functions ---
+  
+  const downloadCSV = (content: string, fileName: string) => {
+    // Add BOM (\uFEFF) so Excel opens UTF-8 files correctly
+    const blob = new Blob(["\uFEFF" + content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Helper to escape CSV fields containing commas or quotes
+  const escapeCsvField = (field: string | number) => {
+    if (field === undefined || field === null) return '';
+    const stringField = String(field);
+    if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+      return `"${stringField.replace(/"/g, '""')}"`;
+    }
+    return stringField;
+  };
+
+  const handleExportOverview = () => {
+    const headers = ['組別代號', '組別名稱', '總得票數'];
+    const rows = chartData.map(d => [
+      escapeCsvField(d.id),
+      escapeCsvField(d.name),
+      d.votes
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    downloadCSV(csvContent, '投票結果_總覽.csv');
+  };
+
+  const handleExportDetails = () => {
+    // Dynamic headers based on sorted groups
+    const groupHeaders = sortedGroups.map(g => `${g.id}組`);
+    const headers = ['投票人姓名', '學號/ID', 'Email', '身分', ...groupHeaders];
+    
+    const rows = votes.map(vote => {
+      const voter = users.find(u => u.id === vote.userId);
+      // Basic User Info
+      const userInfo = [
+        escapeCsvField(voter?.name || vote.userId),
+        escapeCsvField(vote.userId),
+        escapeCsvField(voter?.email || ''),
+        escapeCsvField(voter?.role || '')
+      ];
+      
+      // Allocations for each group (in order)
+      const voteCounts = sortedGroups.map(g => {
+        const alloc = vote.allocations.find(a => a.groupId === g.id);
+        return alloc ? alloc.count : 0;
+      });
+
+      return [...userInfo, ...voteCounts];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    downloadCSV(csvContent, '投票結果_個別明細.csv');
+  };
+
+
   // --- RENDER: 1. Waiting Screen ---
   if (viewState === 'hidden') {
     return (
@@ -120,24 +194,44 @@ export const Results: React.FC = () => {
   // --- RENDER: 3. Actual Results Dashboard (Restored original content with fade-in) ---
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8 animate-[fadeIn_1s_ease-out]">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold text-brand-900 flex items-center gap-2">
           <PartyPopper className="text-ignobel-yellow animate-bounce" size={32} />
           投票結果儀表板
         </h1>
-        <div className="flex bg-gray-200 rounded-lg p-1">
+        
+        <div className="flex flex-wrap gap-2 justify-center">
+          {/* Export Buttons */}
           <button 
-            onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'overview' ? 'bg-white shadow text-brand-600' : 'text-gray-600 hover:text-gray-900'}`}
+            onClick={handleExportOverview}
+            className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 shadow-sm transition-colors"
           >
-            總覽
+            <Download size={16} />
+            匯出總覽
           </button>
           <button 
-            onClick={() => setActiveTab('details')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'details' ? 'bg-white shadow text-brand-600' : 'text-gray-600 hover:text-gray-900'}`}
+            onClick={handleExportDetails}
+            className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 shadow-sm transition-colors mr-4"
           >
-            投票細節
+            <FileSpreadsheet size={16} />
+            匯出明細
           </button>
+
+          {/* Tab Switcher */}
+          <div className="flex bg-gray-200 rounded-lg p-1">
+            <button 
+              onClick={() => setActiveTab('overview')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'overview' ? 'bg-white shadow text-brand-600' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              總覽
+            </button>
+            <button 
+              onClick={() => setActiveTab('details')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'details' ? 'bg-white shadow text-brand-600' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              投票細節
+            </button>
+          </div>
         </div>
       </div>
 
