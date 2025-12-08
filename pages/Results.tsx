@@ -1,14 +1,18 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Trophy } from 'lucide-react';
+import { Trophy, Sparkles, Timer, PartyPopper } from 'lucide-react';
 
 const COLORS = ['#8b5cf6', '#0ea5e9', '#fbbf24', '#ef4444', '#10b981', '#f59e0b', '#ec4899', '#6366f1', '#84cc16', '#14b8a6'];
 
 export const Results: React.FC = () => {
   const { groups, votes, users, currentUser } = useApp();
   const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
+  
+  // View State: 'hidden' (waiting), 'counting' (3-2-1), 'revealed' (show data)
+  const [viewState, setViewState] = useState<'hidden' | 'counting' | 'revealed'>('hidden');
+  const [countdown, setCountdown] = useState(3);
 
   // Security check
   if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.TEACHER)) {
@@ -52,11 +56,73 @@ export const Results: React.FC = () => {
     return [...groups].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
   }, [groups]);
 
+  // Handle Reveal Animation
+  const startReveal = () => {
+    setViewState('counting');
+  };
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (viewState === 'counting') {
+      if (countdown > 0) {
+        timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+      } else {
+        setViewState('revealed');
+      }
+    }
+    return () => clearTimeout(timer);
+  }, [viewState, countdown]);
+
+  // --- RENDER: 1. Waiting Screen ---
+  if (viewState === 'hidden') {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center bg-gradient-to-b from-brand-900 to-brand-700 text-white rounded-xl shadow-2xl p-8 m-4">
+        <div className="mb-8 relative">
+          <div className="absolute inset-0 bg-yellow-400 blur-3xl opacity-20 animate-pulse"></div>
+          <Trophy size={120} className="text-ignobel-yellow relative z-10 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]" />
+        </div>
+        <h1 className="text-4xl md:text-6xl font-extrabold mb-4 text-center tracking-tight">
+          投票結果即將揭曉
+        </h1>
+        <p className="text-xl text-brand-100 mb-12 text-center max-w-2xl">
+          所有評分數據已收集完畢。準備好揭曉票數囉！
+        </p>
+        <button 
+          onClick={startReveal}
+          className="group relative px-8 py-4 bg-ignobel-yellow text-brand-900 text-2xl font-bold rounded-full shadow-[0_0_20px_rgba(251,191,36,0.4)] hover:shadow-[0_0_40px_rgba(251,191,36,0.6)] hover:scale-105 transition-all duration-300 overflow-hidden"
+        >
+          <span className="relative z-10 flex items-center gap-3">
+            <Sparkles className="animate-spin-slow" />
+            揭曉結果
+            <Sparkles className="animate-spin-slow" />
+          </span>
+          <div className="absolute inset-0 bg-white/30 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+        </button>
+      </div>
+    );
+  }
+
+  // --- RENDER: 2. Countdown Screen ---
+  if (viewState === 'counting') {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center bg-brand-900 text-white rounded-xl m-4">
+        <div className="text-[12rem] md:text-[20rem] font-black text-ignobel-yellow animate-bounce drop-shadow-2xl">
+          {countdown > 0 ? countdown : "GO!"}
+        </div>
+        <div className="mt-8 flex items-center gap-2 text-2xl text-brand-200">
+          <Timer className="animate-spin" />
+          <span>正在計算票數...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER: 3. Actual Results Dashboard (Restored original content with fade-in) ---
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-8">
+    <div className="max-w-7xl mx-auto p-4 sm:p-8 animate-[fadeIn_1s_ease-out]">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-brand-900 flex items-center gap-2">
-          <Trophy className="text-ignobel-yellow" size={32} />
+          <PartyPopper className="text-ignobel-yellow animate-bounce" size={32} />
           投票結果儀表板
         </h1>
         <div className="flex bg-gray-200 rounded-lg p-1">
@@ -80,10 +146,16 @@ export const Results: React.FC = () => {
           {/* Top Cards (Ranked by Votes) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
              {topPerformers.slice(0, 3).map((r, idx) => (
-               <div key={r.id} className={`bg-white p-6 rounded-xl shadow-lg border-t-4 ${idx === 0 ? 'border-ignobel-yellow transform scale-105' : 'border-brand-500'}`}>
-                 <div className="text-gray-500 text-sm font-bold uppercase tracking-wide">第 {idx + 1} 名</div>
-                 <div className="text-2xl font-bold mt-1 mb-2 leading-tight">{r.name}</div>
-                 <div className="text-4xl font-extrabold text-brand-900">{r.votes} <span className="text-lg font-normal text-gray-400">票</span></div>
+               <div key={r.id} className={`bg-white p-6 rounded-xl shadow-lg border-t-4 transition-all duration-700 hover:scale-105 ${idx === 0 ? 'border-ignobel-yellow transform scale-105 ring-4 ring-ignobel-yellow/20' : 'border-brand-500'}`}>
+                 <div className="flex justify-between items-start">
+                    <div className="text-gray-500 text-sm font-bold uppercase tracking-wide">第 {idx + 1} 名</div>
+                    {idx === 0 && <Trophy className="text-ignobel-yellow" size={24} />}
+                 </div>
+                 <div className="text-2xl font-bold mt-2 mb-2 leading-tight text-gray-800">{r.name}</div>
+                 <div className="flex items-baseline gap-2">
+                    <div className="text-5xl font-extrabold text-brand-900">{r.votes}</div>
+                    <span className="text-lg font-normal text-gray-400">票</span>
+                 </div>
                </div>
              ))}
           </div>

@@ -8,7 +8,7 @@ import { Results } from './pages/Results';
 import { Admin } from './pages/Admin';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
-const App: React.FC = () => {
+const App = () => {
   return (
     <AppProvider>
       <HashRouter>

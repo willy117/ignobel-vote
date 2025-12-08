@@ -34,7 +34,7 @@ export const Vote: React.FC = () => {
   }
 
   const maxVotes = currentUser.role === UserRole.STUDENT ? 3 : 6;
-  const currentTotal = Object.values(allocations).reduce((a, b) => a + b, 0);
+  const currentTotal = Object.values(allocations).reduce((a: number, b: number) => a + b, 0);
   const remainingVotes = maxVotes - currentTotal;
   const roleName = currentUser.role === UserRole.STUDENT ? '學生' : (currentUser.role === UserRole.TEACHER ? '教師/助教' : '管理員');
 
@@ -52,7 +52,7 @@ export const Vote: React.FC = () => {
   const handleSubmit = () => {
     if (remainingVotes !== 0) return;
     const submission = Object.entries(allocations)
-      .filter(([_, count]) => count > 0)
+      .filter(([_, count]: [string, number]) => count > 0)
       .map(([groupId, count]) => ({ groupId, count }));
     submitVote(submission);
   };
